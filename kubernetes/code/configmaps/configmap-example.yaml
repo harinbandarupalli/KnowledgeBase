@@ -1,0 +1,97 @@
+# ========================================
+# ConfigMap + Environment Variables Example
+# ========================================
+# ConfigMaps decouple configuration from container images.
+# They store non-sensitive key-value pairs.
+
+# ----------------------------------------
+# Step 1: Define the ConfigMap
+# ----------------------------------------
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+data:
+  # Simple key-value pairs
+  database-host: "mongodb-service"
+  database-port: "27017"
+  story-folder: "story"
+  log-level: "info"
+
+  # Multi-line config file
+  app-settings.json: |
+    {
+      "port": 3000,
+      "debug": false,
+      "features": {
+        "darkMode": true,
+        "analytics": true
+      }
+    }
+
+---
+# ----------------------------------------
+# Step 2: Deployment using ConfigMap values as env vars
+# ----------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: configmap-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: configmap-demo
+  template:
+    metadata:
+      labels:
+        app: configmap-demo
+    spec:
+      containers:
+        - name: app
+          image: academind/kub-data-demo:2
+          ports:
+            - containerPort: 3000
+
+          # Option A: Individual keys as env vars
+          env:
+            - name: STORY_FOLDER
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: story-folder
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: database-host
+
+          # Option B: ALL keys as env vars (uncomment to use)
+          # envFrom:
+          #   - configMapRef:
+          #       name: app-config
+
+          # Option C: Mount ConfigMap as files (uncomment to use)
+          # volumeMounts:
+          #   - name: config-volume
+          #     mountPath: /app/config
+          #     readOnly: true
+
+      # Uncomment for Option C
+      # volumes:
+      #   - name: config-volume
+      #     configMap:
+      #       name: app-config
+
+# ========================================
+# Imperative ConfigMap Creation
+# ========================================
+# kubectl create configmap app-config \
+#   --from-literal=database-host=mongodb-service \
+#   --from-literal=database-port=27017
+#
+# kubectl create configmap app-config --from-file=config.json
+# kubectl create configmap app-config --from-env-file=.env
+#
+# kubectl get configmap
+# kubectl describe configmap app-config

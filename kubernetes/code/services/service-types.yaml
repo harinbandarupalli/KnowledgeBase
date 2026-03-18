@@ -1,0 +1,59 @@
+# ========================================
+# ClusterIP Service (Internal Only)
+# ========================================
+# Use when: Pods need to communicate within the cluster
+# NOT accessible from outside the cluster
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-clusterip
+spec:
+  type: ClusterIP              # Default — internal only
+  selector:
+    app: advanced-app           # Routes traffic to Pods with this label
+  ports:
+    - protocol: TCP
+      port: 80                  # Port the Service listens on
+      targetPort: 8080          # Port the container listens on
+
+---
+# ========================================
+# NodePort Service (External via Node IP)
+# ========================================
+# Use when: Development / testing — access via <NodeIP>:<NodePort>
+# Port range: 30000-32767
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-nodeport
+spec:
+  type: NodePort
+  selector:
+    app: advanced-app
+  ports:
+    - protocol: TCP
+      port: 80                  # Service port (internal)
+      targetPort: 8080          # Container port
+      nodePort: 30080           # External port on the node (optional, auto-assigned if omitted)
+
+---
+# ========================================
+# LoadBalancer Service (External via Cloud LB)
+# ========================================
+# Use when: Production on cloud providers (AWS, GCP, Azure)
+# Provisions a cloud load balancer automatically
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-loadbalancer
+spec:
+  type: LoadBalancer
+  selector:
+    app: advanced-app
+  ports:
+    - protocol: TCP
+      port: 80                  # External port (what users connect to)
+      targetPort: 8080          # Container port

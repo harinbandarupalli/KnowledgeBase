@@ -1,0 +1,119 @@
+# ========================================
+# AWS EKS — EFS Volume Configuration
+# ========================================
+# Complete setup for using AWS EFS (Elastic File System)
+# with Kubernetes Persistent Volumes via the CSI driver.
+#
+# Prerequisites:
+# 1. EKS cluster running with worker nodes
+# 2. EFS CSI Driver installed:
+#    kubectl apply -k "github.com/kubernetes-sigs/aws-efs-csi-driver/deploy/kubernetes/overlays/stable/?ref=release-1.7"
+# 3. EFS file system created in AWS (note the fs-XXXX ID)
+# 4. Mount targets created in each subnet with proper security groups
+
+---
+# ----------------------------------------
+# Step 1: StorageClass for EFS
+# ----------------------------------------
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: efs-sc
+provisioner: efs.csi.aws.com
+parameters:
+  provisioningMode: efs-ap              # Elastic File System access point
+  fileSystemId: fs-abc12345             # ← Replace with your EFS ID
+  directoryPerms: "700"
+
+---
+# ----------------------------------------
+# Step 2: PersistentVolume for EFS
+# ----------------------------------------
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: efs-pv
+spec:
+  capacity:
+    storage: 5Gi                        # EFS is elastic; K8s requires a value
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteMany                      # Multiple nodes can read/write!
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: efs-sc
+  csi:
+    driver: efs.csi.aws.com             # EFS CSI driver
+    volumeHandle: fs-abc12345           # ← Replace with your EFS ID
+
+---
+# ----------------------------------------
+# Step 3: PersistentVolumeClaim
+# ----------------------------------------
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: efs-pvc
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: efs-sc
+  resources:
+    requests:
+      storage: 5Gi
+
+---
+# ----------------------------------------
+# Step 4: Deployment using the EFS PVC
+# ----------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: users-deployment
+spec:
+  replicas: 2                            # Both replicas share the same EFS!
+  selector:
+    matchLabels:
+      app: users
+  template:
+    metadata:
+      labels:
+        app: users
+    spec:
+      containers:
+        - name: users-api
+          image: academind/kub-demo-users:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: MONGODB_CONNECTION_URI
+              value: "mongodb://mongodb-service:27017/users"
+          volumeMounts:
+            - name: efs-vol
+              mountPath: /app/users-data
+      volumes:
+        - name: efs-vol
+          persistentVolumeClaim:
+            claimName: efs-pvc
+
+# ========================================
+# Useful Commands
+# ========================================
+# # Install EFS CSI driver
+# kubectl apply -k "github.com/kubernetes-sigs/aws-efs-csi-driver/deploy/kubernetes/overlays/stable/?ref=release-1.7"
+#
+# # Apply all resources
+# kubectl apply -f efs-volume.yaml
+#
+# # Verify
+# kubectl get sc
+# kubectl get pv
+# kubectl get pvc
+# kubectl get pods -o wide
+#
+# # Test shared storage across Pods
+# kubectl exec <pod-1> -- sh -c "echo hello > /app/users-data/test.txt"
+# kubectl exec <pod-2> -- cat /app/users-data/test.txt
+#
+# # Cleanup (IMPORTANT for cost!)
+# kubectl delete -f efs-volume.yaml
+# aws efs delete-file-system --file-system-id fs-abc12345

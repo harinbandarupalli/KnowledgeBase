@@ -1,0 +1,112 @@
+# ========================================
+# Multi-Container Pod (Pod-Internal Communication)
+# ========================================
+# Containers in the same Pod communicate via localhost
+# They share the same network namespace
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: users-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: users
+  template:
+    metadata:
+      labels:
+        app: users
+    spec:
+      containers:
+        # Container 1: Users API
+        - name: users-api
+          image: academind/kub-demo-users:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: MONGODB_CONNECTION_URI
+              value: "mongodb://localhost:27017/users"   # ← localhost!
+            - name: AUTH_API_ADDRESS
+              value: "localhost"                          # ← same Pod
+
+        # Container 2: Auth API (sidecar)
+        - name: auth-api
+          image: academind/kub-demo-auth:latest
+          ports:
+            - containerPort: 3000                        # Different port!
+
+---
+# ========================================
+# Separate Deployments (Pod-to-Pod via DNS)
+# ========================================
+# For loosely coupled services — use Kubernetes DNS
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tasks-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tasks
+  template:
+    metadata:
+      labels:
+        app: tasks
+    spec:
+      containers:
+        - name: tasks-api
+          image: academind/kub-demo-tasks:latest
+          ports:
+            - containerPort: 8000
+          env:
+            # Use Kubernetes Service DNS name (NOT localhost!)
+            - name: AUTH_API_ADDRESS
+              value: "auth-service.default"   # <service>.<namespace>
+            - name: TASKS_FOLDER
+              value: "tasks"
+
+---
+# ========================================
+# ClusterIP Services for Internal Communication
+# ========================================
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: users-service
+spec:
+  type: LoadBalancer          # External access for users API
+  selector:
+    app: users
+  ports:
+    - port: 8080
+      targetPort: 8080
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-service
+spec:
+  type: ClusterIP              # Internal only — other Pods use DNS
+  selector:
+    app: auth
+  ports:
+    - port: 3000
+      targetPort: 3000
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tasks-service
+spec:
+  type: LoadBalancer           # External access for tasks API
+  selector:
+    app: tasks
+  ports:
+    - port: 8000
+      targetPort: 8000

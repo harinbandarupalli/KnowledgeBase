@@ -1,0 +1,44 @@
+# ========================================
+# hostPath Volume Example
+# ========================================
+# Lifetime: data persists on the node even after Pod deletion
+# Warning: NOT multi-node safe! Data is specific to the node.
+# Use case: development / single-node clusters (Minikube)
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hostpath-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hostpath-demo
+  template:
+    metadata:
+      labels:
+        app: hostpath-demo
+    spec:
+      containers:
+        - name: app
+          image: academind/kub-data-demo:1
+          ports:
+            - containerPort: 3000
+          volumeMounts:
+            - name: story-volume
+              mountPath: /app/story    # Path inside the container
+
+      volumes:
+        - name: story-volume
+          hostPath:
+            path: /data               # Path on the HOST NODE
+            type: DirectoryOrCreate    # Create if doesn't exist
+
+# ----------------------------------------
+# hostPath type options:
+# ----------------------------------------
+# ""                 — No checks before mount
+# DirectoryOrCreate  — Create directory if not exists
+# Directory          — Directory must already exist
+# FileOrCreate       — Create file if not exists
+# File               — File must already exist

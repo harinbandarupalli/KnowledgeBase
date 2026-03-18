@@ -1,0 +1,45 @@
+# ========================================
+# emptyDir Volume Example
+# ========================================
+# Lifetime: tied to the Pod (survives container restarts, NOT Pod deletion)
+# Use case: scratch space, caching, sharing data between containers in same Pod
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: emptydir-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: emptydir-demo
+  template:
+    metadata:
+      labels:
+        app: emptydir-demo
+    spec:
+      containers:
+        - name: app
+          image: academind/kub-data-demo:1
+          ports:
+            - containerPort: 3000
+          volumeMounts:
+            - name: story-volume
+              mountPath: /app/story    # Path inside the container
+
+      volumes:
+        - name: story-volume
+          emptyDir: {}                 # Empty directory, created when Pod starts
+
+---
+# ========================================
+# RAM-backed emptyDir (faster, uses memory)
+# ========================================
+# apiVersion: apps/v1
+# kind: Deployment
+# ...
+#       volumes:
+#         - name: cache-volume
+#           emptyDir:
+#             medium: Memory           # Use RAM instead of disk
+#             sizeLimit: 256Mi         # Size limit

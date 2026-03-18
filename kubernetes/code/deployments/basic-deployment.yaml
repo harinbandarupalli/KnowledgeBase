@@ -1,0 +1,28 @@
+# Imperative Deployment
+# Run this command to create a deployment imperatively:
+# kubectl create deployment first-app --image=kub-first-app
+
+# ---
+
+# Declarative Deployment - Basic
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: first-app-deployment
+  labels:
+    app: first-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: first-app
+  template:
+    metadata:
+      labels:
+        app: first-app
+    spec:
+      containers:
+        - name: first-node
+          image: academind/kub-first-app:1
+          ports:
+            - containerPort: 8080

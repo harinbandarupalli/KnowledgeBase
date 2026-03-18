@@ -1,0 +1,87 @@
+# ========================================
+# Persistent Volume (PV) + Persistent Volume Claim (PVC)
+# ========================================
+# PV = Cluster-level storage resource (created by admin)
+# PVC = Request for storage (created by developer)
+# Together they decouple storage provisioning from consumption.
+
+# ----------------------------------------
+# Step 1: Create the PersistentVolume (Admin)
+# ----------------------------------------
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: host-pv
+spec:
+  capacity:
+    storage: 1Gi                         # Total storage
+  volumeMode: Filesystem                  # Filesystem or Block
+  storageClassName: standard              # For matching with PVCs
+  accessModes:
+    - ReadWriteOnce                       # Single node read-write
+  persistentVolumeReclaimPolicy: Retain   # Keep data after PVC deletion
+  hostPath:                               # Backend storage type (dev only)
+    path: /data
+    type: DirectoryOrCreate
+
+---
+# ----------------------------------------
+# Step 2: Create the PersistentVolumeClaim (Developer)
+# ----------------------------------------
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: host-pvc
+spec:
+  volumeName: host-pv                     # Bind to specific PV (optional)
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: standard              # Must match PV's storageClassName
+  resources:
+    requests:
+      storage: 1Gi                        # Requested amount
+
+---
+# ----------------------------------------
+# Step 3: Use the PVC in a Deployment (Developer)
+# ----------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: story-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: story
+  template:
+    metadata:
+      labels:
+        app: story
+    spec:
+      containers:
+        - name: story
+          image: academind/kub-data-demo:2
+          ports:
+            - containerPort: 3000
+          volumeMounts:
+            - name: story-volume
+              mountPath: /app/story
+      volumes:
+        - name: story-volume
+          persistentVolumeClaim:
+            claimName: host-pvc            # Reference the PVC
+
+# ----------------------------------------
+# Access Modes Reference:
+# ----------------------------------------
+# ReadWriteOnce (RWO)     — read-write by a single node
+# ReadOnlyMany  (ROX)     — read-only by many nodes
+# ReadWriteMany (RWX)     — read-write by many nodes
+# ReadWriteOncePod (RWOP) — read-write by a single Pod (K8s 1.22+)
+#
+# Reclaim Policies:
+# ----------------------------------------
+# Retain  — PV kept after PVC deletion (manual cleanup)
+# Delete  — PV and storage deleted when PVC is deleted
+# Recycle — (Deprecated) scrubs data and makes PV available

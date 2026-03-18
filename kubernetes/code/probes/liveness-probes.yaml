@@ -1,0 +1,112 @@
+# ========================================
+# Liveness & Readiness Probe Examples
+# ========================================
+# Liveness Probe  → Is the container alive? If not → RESTART it
+# Readiness Probe → Is the container ready for traffic? If not → REMOVE from Service endpoints
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: probes-demo
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: probes-demo
+  template:
+    metadata:
+      labels:
+        app: probes-demo
+    spec:
+      containers:
+        - name: web
+          image: academind/kub-first-app:2
+          ports:
+            - containerPort: 8080
+
+          # ============================
+          # HTTP GET Liveness Probe
+          # ============================
+          # Sends an HTTP GET request to /healthz on port 8080
+          # Success: 2xx or 3xx response
+          # Failure: anything else or timeout
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 15   # Wait 15s after container starts
+            periodSeconds: 10         # Check every 10 seconds
+            failureThreshold: 3       # Restart after 3 consecutive failures
+            timeoutSeconds: 2         # Each probe times out after 2s
+            successThreshold: 1       # 1 success to be considered healthy again
+
+          # ============================
+          # HTTP GET Readiness Probe
+          # ============================
+          # Same mechanism as liveness but doesn't restart —
+          # instead removes Pod from Service endpoints
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 3
+
+---
+# ========================================
+# TCP Socket Probe Example
+# ========================================
+# Useful for non-HTTP services like databases
+
+# apiVersion: apps/v1
+# kind: Deployment
+# ...
+#     spec:
+#       containers:
+#         - name: mysql
+#           image: mysql:8.0
+#           ports:
+#             - containerPort: 3306
+#           livenessProbe:
+#             tcpSocket:
+#               port: 3306           # Try to open TCP connection
+#             initialDelaySeconds: 30
+#             periodSeconds: 20
+#           readinessProbe:
+#             tcpSocket:
+#               port: 3306
+#             initialDelaySeconds: 15
+#             periodSeconds: 10
+
+---
+# ========================================
+# Exec Command Probe Example
+# ========================================
+# Runs a command inside the container
+# Success: exit code 0
+# Failure: non-zero exit code
+
+# apiVersion: apps/v1
+# kind: Deployment
+# ...
+#     spec:
+#       containers:
+#         - name: app
+#           image: my-custom-app
+#           livenessProbe:
+#             exec:
+#               command:
+#                 - cat
+#                 - /tmp/healthy      # File exists = healthy
+#             initialDelaySeconds: 5
+#             periodSeconds: 5
+
+# ========================================
+# Probe Parameters Reference
+# ========================================
+# initialDelaySeconds (default: 0)     — Seconds before first probe
+# periodSeconds       (default: 10)    — How often to probe
+# timeoutSeconds      (default: 1)     — Timeout for each probe
+# successThreshold    (default: 1)     — Consecutive successes after failure
+# failureThreshold    (default: 3)     — Consecutive failures before action
